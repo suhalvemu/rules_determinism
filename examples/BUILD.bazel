@@ -1,0 +1,7 @@
+load("@rules_determinism//determinism:defs.bzl", "determinism_test")
+
+# Run with: bazel test //:hello_is_deterministic
+determinism_test(
+    name = "hello_is_deterministic",
+    targets = ["//apps:hello"],
+)

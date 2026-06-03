@@ -1,0 +1,28 @@
+load("@rules_python//python:defs.bzl", "py_binary")
+
+py_binary(
+    name = "static_check",
+    srcs = ["static_check.py"],
+    main = "static_check.py",
+    visibility = ["//determinism:__subpackages__"],
+)
+
+py_binary(
+    name = "summarize",
+    srcs = ["summarize.py"],
+    main = "summarize.py",
+    visibility = ["//determinism:__subpackages__"],
+)
+
+sh_binary(
+    name = "dynamic_check",
+    srcs = ["dynamic_check.sh"],
+    visibility = ["//determinism:__subpackages__"],
+)
+
+exports_files([
+    "rules.bzl",
+    "static_check.py",
+    "summarize.py",
+    "dynamic_check.sh",
+])

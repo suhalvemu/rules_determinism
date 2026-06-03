@@ -1,0 +1,13 @@
+module(name = "rules_determinism_example")
+
+bazel_dep(name = "rules_determinism", version = "0.1.0")
+bazel_dep(name = "rules_go", version = "0.53.0")
+
+# When using a local copy during development:
+# local_path_override(
+#     module_name = "rules_determinism",
+#     path = "..",
+# )
+
+go_sdk = use_extension("@rules_go//go:extensions.bzl", "go_sdk")
+go_sdk.download(version = "1.23.0")

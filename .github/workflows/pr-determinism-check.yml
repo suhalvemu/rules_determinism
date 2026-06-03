@@ -1,0 +1,154 @@
+name: Determinism Check (Reusable)
+
+# Reusable workflow — call from any repo's PR workflow:
+#
+#   jobs:
+#     determinism:
+#       uses: suhalvemu/rules_determinism/.github/workflows/pr-determinism-check.yml@main
+#       with:
+#         bazel_targets: "//apps/go-service //apps/cpp-lib"
+#       secrets:
+#         buildbuddy_api_key: ${{ secrets.BUILDBUDDY_API_KEY }}
+
+on:
+  workflow_call:
+    inputs:
+      bazel_targets:
+        description: "Space-separated Bazel targets to check. Defaults to changed packages."
+        required: false
+        type: string
+        default: ""
+      max_targets:
+        description: "Maximum number of targets to check dynamically."
+        required: false
+        type: number
+        default: 20
+      fail_on_static_high:
+        description: "Fail PR on HIGH severity static findings."
+        required: false
+        type: boolean
+        default: true
+      fail_on_dynamic:
+        description: "Fail PR if dynamic analysis finds non-deterministic outputs."
+        required: false
+        type: boolean
+        default: true
+    secrets:
+      buildbuddy_api_key:
+        description: "BuildBuddy API key for remote cache (optional)."
+        required: false
+
+jobs:
+  determinism-check:
+    name: Determinism Check
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Bazel
+        uses: bazel-contrib/setup-bazel@0.8.5
+        with:
+          bazelisk-cache: true
+          repository-cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Find changed targets
+        id: targets
+        run: |
+          if [[ -n "${{ inputs.bazel_targets }}" ]]; then
+            echo "${{ inputs.bazel_targets }}" | tr ' ' '\n' > /tmp/targets.txt
+          else
+            BASE="${{ github.event.pull_request.base.sha }}"
+            HEAD="${{ github.event.pull_request.head.sha }}"
+            git diff --name-only "$BASE"..."$HEAD" 2>/dev/null | \
+              xargs -I{} dirname {} | sort -u | \
+              while read pkg; do
+                [[ -f "$pkg/BUILD.bazel" || -f "$pkg/BUILD" ]] && echo "//$pkg:all"
+              done | head -${{ inputs.max_targets }} > /tmp/targets.txt
+          fi
+          echo "Targets to check:"
+          cat /tmp/targets.txt
+          echo "count=$(wc -l < /tmp/targets.txt)" >> "$GITHUB_OUTPUT"
+
+      - name: Static analysis
+        id: static
+        run: |
+          curl -fsSL \
+            https://raw.githubusercontent.com/suhalvemu/rules_determinism/main/determinism/private/static_check.py \
+            -o /tmp/static_check.py
+          git diff --name-only \
+            "${{ github.event.pull_request.base.sha }}"..."${{ github.event.pull_request.head.sha }}" \
+            2>/dev/null | python3 /tmp/static_check.py --stdin > /tmp/static_report.json
+          HIGH=$(python3 -c "import json; r=json.load(open('/tmp/static_report.json')); print(r.get('summary',{}).get('HIGH',0))")
+          echo "high=$HIGH" >> "$GITHUB_OUTPUT"
+
+      - name: Dynamic analysis
+        id: dynamic
+        if: steps.targets.outputs.count != '0'
+        run: |
+          curl -fsSL \
+            https://raw.githubusercontent.com/suhalvemu/rules_determinism/main/determinism/private/dynamic_check.sh \
+            -o /tmp/dynamic_check.sh
+          chmod +x /tmp/dynamic_check.sh
+          TARGETS=$(cat /tmp/targets.txt | tr '\n' ' ')
+          /tmp/dynamic_check.sh $TARGETS > /tmp/dynamic_report.json 2>/tmp/dynamic_stderr.txt || true
+          DETERMINISTIC=$(python3 -c "import json; r=json.load(open('/tmp/dynamic_report.json')); print(str(r.get('deterministic',True)).lower())")
+          echo "deterministic=$DETERMINISTIC" >> "$GITHUB_OUTPUT"
+        env:
+          BUILDBUDDY_API_KEY: ${{ secrets.buildbuddy_api_key }}
+
+      - name: Generate and post PR comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { execSync } = require('child_process');
+            const fs = require('fs');
+
+            // Ensure dynamic report exists
+            if (!fs.existsSync('/tmp/dynamic_report.json')) {
+              fs.writeFileSync('/tmp/dynamic_report.json',
+                JSON.stringify({deterministic:true,targets_checked:[],differing_output_files:[],error:"skipped"}));
+            }
+
+            // Download summarize.py
+            execSync('curl -fsSL https://raw.githubusercontent.com/suhalvemu/rules_determinism/main/determinism/private/summarize.py -o /tmp/summarize.py');
+            execSync(`python3 /tmp/summarize.py --static /tmp/static_report.json --dynamic /tmp/dynamic_report.json --pr-number ${context.issue.number} --commit ${context.sha} > /tmp/pr_comment.md`);
+
+            const body = fs.readFileSync('/tmp/pr_comment.md', 'utf8');
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+
+            const comments = await github.rest.issues.listComments({ owner, repo, issue_number });
+            for (const c of comments.data) {
+              if (c.user.type === 'Bot' && c.body.includes('Determinism Check')) {
+                await github.rest.issues.deleteComment({ owner, repo, comment_id: c.id });
+              }
+            }
+            await github.rest.issues.createComment({ owner, repo, issue_number, body });
+
+      - name: Enforce gate
+        run: |
+          HIGH="${{ steps.static.outputs.high }}"
+          DETERMINISTIC="${{ steps.dynamic.outputs.deterministic }}"
+
+          if [[ "${{ inputs.fail_on_static_high }}" == "true" && "$HIGH" -gt 0 ]]; then
+            echo "❌ FAILED: $HIGH HIGH risk pattern(s) found." >&2
+            exit 1
+          fi
+
+          if [[ "${{ inputs.fail_on_dynamic }}" == "true" && "$DETERMINISTIC" == "false" ]]; then
+            echo "❌ FAILED: Non-deterministic outputs detected." >&2
+            exit 1
+          fi
+
+          echo "✅ PASSED"
