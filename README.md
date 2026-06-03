@@ -52,7 +52,7 @@ bazel_dep(name = "rules_determinism", version = "0.1.0")
 
 ```python
 # BUILD.bazel
-load("@rules_determinism//determinism:defs.bzl", "determinism_test")
+load("@rules_determinism//:defs.bzl", "determinism_test")
 
 determinism_test(
     name = "check_determinism",

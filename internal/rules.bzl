@@ -91,17 +91,17 @@ determinism_test = rule(
             doc = "Cap on number of targets checked to keep CI fast.",
         ),
         "_checker": attr.label(
-            default = "//determinism/private:dynamic_check",
+            default = "//internal:dynamic_check",
             executable = True,
             cfg = "exec",
         ),
         "_static_check": attr.label(
-            default = "//determinism/private:static_check",
+            default = "//internal:static_check",
             executable = True,
             cfg = "exec",
         ),
         "_summarize": attr.label(
-            default = "//determinism/private:summarize",
+            default = "//internal:summarize",
             executable = True,
             cfg = "exec",
         ),

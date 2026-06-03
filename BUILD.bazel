@@ -1,2 +1,9 @@
-# Root BUILD — intentionally empty.
-# Public API is in //determinism:defs.bzl
+load("@io_bazel_stardoc//stardoc:stardoc.bzl", "stardoc")
+
+# Regenerate docs: bazel run //:docs
+stardoc(
+    name = "docs",
+    out = "doc/rules.md",
+    input = "//:defs.bzl",
+    deps = ["//internal:rules.bzl"],
+)

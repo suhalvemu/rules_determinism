@@ -1,10 +1,19 @@
 module(
     name = "rules_determinism",
     version = "0.1.0",
+    compatibility_level = 1,
 )
 
-bazel_dep(name = "rules_python", version = "1.4.1")
 bazel_dep(name = "bazel_skylib", version = "1.7.1")
+bazel_dep(name = "rules_python", version = "1.4.1")
+bazel_dep(name = "rules_shell", version = "0.4.1")
+
+bazel_dep(
+    name = "stardoc",
+    version = "0.7.1",
+    dev_dependency = True,
+    repo_name = "io_bazel_stardoc",
+)
 
 python = use_extension("@rules_python//python/extensions:python.bzl", "python")
 python.toolchain(python_version = "3.12")

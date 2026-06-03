@@ -1,0 +1,16 @@
+matrix:
+  platform:
+    - debian11
+    - macos
+    - ubuntu2004
+    - windows
+
+tasks:
+  verify_targets:
+    name: Verify build targets
+    platform: ${{ platform }}
+    build_targets:
+      - "//:defs.bzl"
+      - "//internal:static_check"
+      - "//internal:dynamic_check"
+      - "//internal:summarize"

@@ -1,4 +1,4 @@
-load("@rules_determinism//determinism:defs.bzl", "determinism_test")
+load("@rules_determinism//:defs.bzl", "determinism_test")
 
 # Run with: bazel test //:hello_is_deterministic
 determinism_test(

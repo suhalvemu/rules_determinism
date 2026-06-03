@@ -1,0 +1,15 @@
+{
+    "homepage": "https://github.com/suhalvemu/rules_determinism",
+    "maintainers": [
+        {
+            "email": "vemusuhal@gmail.com",
+            "github": "suhalvemu",
+            "name": "Suhal Vemu"
+        }
+    ],
+    "repository": [
+        "github:suhalvemu/rules_determinism"
+    ],
+    "versions": [],
+    "yanked_versions": {}
+}

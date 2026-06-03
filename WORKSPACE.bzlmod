@@ -1,0 +1,2 @@
+# Intentionally empty — bzlmod (MODULE.bazel) is the source of truth.
+# This file satisfies Bazel when running with --enable_bzlmod.
