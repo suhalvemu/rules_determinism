@@ -18,4 +18,11 @@ jobs:
       - name: Build all targets
         run: bazel build //...
       - name: Run tests
-        run: bazel test //...
+        run: |
+          # Skip gracefully if no test targets exist yet
+          TEST_TARGETS=$(bazel query 'tests(//...)' 2>/dev/null || true)
+          if [ -n "$TEST_TARGETS" ]; then
+            bazel test //...
+          else
+            echo "No test targets found — skipping (add tests to //tests/ to enable)"
+          fi
